@@ -1278,11 +1278,11 @@
   <!-- ========================================================================= -->
   <script>
     // State Store (Database fallback jika koneksi internet terputus)
-    let dbData = {
+    let defaultBackupData = {
       global: {
-        nama: "Sekolah Dasar Unggulan",
+        nama: "SMPN 1 BAJAWA",
         akreditasi: "A",
-        jenjang: "SD",
+        jenjang: "SMA",
         theme: "emerald",
         runningText: "Selamat datang di Portal Digital Web Builder Sekolah Resmi.",
         youtubeId: "7KQ3Ji3-uMQ",
@@ -1311,17 +1311,17 @@
         { id: "yv1", judul: "Video Profil Sekolah Unggulan", videoId: "7KQ3Ji3-uMQ" }
       ],
       sambutan: {
-        nama: "Drs. H. Mulyono, M.Pd",
+        nama: "Kepala Sekolah SMPN 1 BAJAWA",
         nip: "19840212 201101 1 002",
         foto: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&q=80&w=400",
-        text: "<p>Assalamu'alaikum Wr. Wb. Segala puji bagi Allah SWT yang senantiasa melimpahkan hidayah-Nya...</p>"
+        text: "<p>Segala puji bagi Allah SWT yang senantiasa melimpahkan hidayah-Nya sehingga website portal kami resmi mengudara...</p>"
       },
       kontak: {
-        email: "info@sekolahku.sch.id",
+        email: "info@smpn1bajawa.sch.id",
         telepon: "0812-3456-7890",
-        alamat: "Jl. Pendidikan No. 45, Jakarta Selatan",
-        lat: -6.2088,
-        lng: 106.8456
+        alamat: "Bajawa, Flores, Nusa Tenggara Timur",
+        lat: -8.7963,
+        lng: 120.9701
       },
       visi: {
         title: "Terwujudnya Lulusan yang Cerdas, Kompetitif, Berbudi Pekerti Luhur dan Berwawasan Lingkungan Global."
@@ -1356,6 +1356,7 @@
       ]
     };
 
+    let dbData = JSON.parse(JSON.stringify(defaultBackupData));
     let isLoggedIn = false;
     let selectedCalendarDate = null;
     let calendarCurrentMonth = new Date().getMonth();
@@ -1495,9 +1496,20 @@
 
     async function loadDatabase() {
       const result = await apiFetch('getAll');
-      if (result && result.status === "success" && result.data) {
-        dbData = result.data;
-        showToast("Data terbaru berhasil dimuat dari Cloud!");
+      
+      // PERBAIKAN DINAMIS: Jika database kosong / baru / null, kita paksa isi dengan data default agar menu-menu langsung muncul!
+      if (result && result.status === "success") {
+        if (result.data && Object.keys(result.data).length > 0 && result.data.menus) {
+          dbData = result.data;
+          showToast("Data terbaru berhasil dimuat dari Cloud!");
+        } else {
+          // Jika Firebase mendeteksi data masih kosong, lakukan inisialisasi awal otomatis (Autopilot)
+          dbData = JSON.parse(JSON.stringify(defaultBackupData));
+          showToast("Inisialisasi awal data default sekolah...");
+          await syncDatabase(); // Langsung kirim template menu awal ke Firebase Anda
+        }
+      } else {
+        showToast("Menjalankan dalam mode lokal offline.", "error");
       }
       renderClientView();
       renderAdminView();
@@ -1510,6 +1522,8 @@
       const desktopNav = document.getElementById('desktop-nav-menu');
       const mobileNav = document.getElementById('mobile-nav-bar');
       const mobileMoreList = document.getElementById('mobile-more-list');
+
+      if (!desktopNav || !mobileNav || !mobileMoreList) return;
 
       desktopNav.innerHTML = "";
       mobileNav.innerHTML = "";
@@ -1726,93 +1740,105 @@
       // Visi & Misi
       document.getElementById('visi-title').textContent = dbData.visi?.title || "Visi belum diatur";
       const listMisi = document.getElementById('misi-list-container');
-      listMisi.innerHTML = "";
-      (dbData.misi || []).forEach((item, idx) => {
-        listMisi.innerHTML += `
-          <li class="flex items-start gap-2">
-            <span class="w-5 h-5 rounded-full bg-accent-soft text-accent text-xs font-black flex items-center justify-center shrink-0 mt-0.5">${idx+1}</span>
-            <span>${item}</span>
-          </li>
-        `;
-      });
+      if (listMisi) {
+        listMisi.innerHTML = "";
+        (dbData.misi || []).forEach((item, idx) => {
+          listMisi.innerHTML += `
+            <li class="flex items-start gap-2">
+              <span class="w-5 h-5 rounded-full bg-accent-soft text-accent text-xs font-black flex items-center justify-center shrink-0 mt-0.5">${idx+1}</span>
+              <span>${item}</span>
+            </li>
+          `;
+        });
+      }
 
       // Linimasa Sejarah
       const timeline = document.getElementById('history-timeline-container');
-      timeline.innerHTML = "";
-      (dbData.sejarah || []).forEach(item => {
-        timeline.innerHTML += `
-          <div class="relative pl-6 md:pl-8">
-            <div class="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-accent border-4 border-white ring-4 ring-emerald-100"></div>
-            <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-4 mb-1">
-              <span class="bg-primary text-white text-xs font-black px-2.5 py-0.5 rounded-full w-fit">${item.tahun}</span>
-              <h4 class="font-bold text-slate-800 text-sm md:text-base">${item.judul}</h4>
+      if (timeline) {
+        timeline.innerHTML = "";
+        (dbData.sejarah || []).forEach(item => {
+          timeline.innerHTML += `
+            <div class="relative pl-6 md:pl-8">
+              <div class="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-accent border-4 border-white ring-4 ring-emerald-100"></div>
+              <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-4 mb-1">
+                <span class="bg-primary text-white text-xs font-black px-2.5 py-0.5 rounded-full w-fit">${item.tahun}</span>
+                <h4 class="font-bold text-slate-800 text-sm md:text-base">${item.judul}</h4>
+              </div>
+              <p class="text-slate-500 text-xs md:text-sm leading-relaxed">${item.deskripsi}</p>
             </div>
-            <p class="text-slate-500 text-xs md:text-sm leading-relaxed">${item.deskripsi}</p>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       // Ekstrakurikuler Card List
       const ekskulBox = document.getElementById('ekskul-grid-container');
-      ekskulBox.innerHTML = "";
-      (dbData.ekskul || []).forEach(item => {
-        ekskulBox.innerHTML += `
-          <div class="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition">
-            <img src="${item.foto}" alt="${item.nama}" class="w-full h-44 object-cover">
-            <div class="p-5 space-y-2">
-              <h4 class="font-extrabold text-slate-800 text-base">${item.nama}</h4>
-              <p class="text-slate-500 text-xs leading-relaxed">${item.deskripsi}</p>
+      if (ekskulBox) {
+        ekskulBox.innerHTML = "";
+        (dbData.ekskul || []).forEach(item => {
+          ekskulBox.innerHTML += `
+            <div class="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition">
+              <img src="${item.foto}" alt="${item.nama}" class="w-full h-44 object-cover">
+              <div class="p-5 space-y-2">
+                <h4 class="font-extrabold text-slate-800 text-base">${item.nama}</h4>
+                <p class="text-slate-500 text-xs leading-relaxed">${item.deskripsi}</p>
+              </div>
             </div>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       // Alumni testimonials
       const alumniBox = document.getElementById('alumni-grid-container');
-      alumniBox.innerHTML = "";
-      (dbData.alumni || []).forEach(item => {
-        alumniBox.innerHTML += `
-          <div class="bg-slate-50 p-6 rounded-3xl relative flex flex-col justify-between space-y-4 border border-slate-100">
-            <p class="text-slate-600 text-xs italic leading-relaxed">"${item.text}"</p>
-            <div>
-              <h4 class="font-bold text-slate-800 text-sm">${item.nama}</h4>
-              <p class="text-[11px] font-bold text-accent">Lulusan ${item.tahun} &bull; ${item.kerja}</p>
+      if (alumniBox) {
+        alumniBox.innerHTML = "";
+        (dbData.alumni || []).forEach(item => {
+          alumniBox.innerHTML += `
+            <div class="bg-slate-50 p-6 rounded-3xl relative flex flex-col justify-between space-y-4 border border-slate-100">
+              <p class="text-slate-600 text-xs italic leading-relaxed">"${item.text}"</p>
+              <div>
+                <h4 class="font-bold text-slate-800 text-sm">${item.nama}</h4>
+                <p class="text-[11px] font-bold text-accent">Lulusan ${item.tahun} &bull; ${item.kerja}</p>
+              </div>
             </div>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       // Album Foto
       const photoBox = document.getElementById('gallery-photo-grid');
-      photoBox.innerHTML = "";
-      (dbData.galeri || []).forEach(item => {
-        photoBox.innerHTML += `
-          <div class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer shadow-sm" onclick="openLightbox('${item.url}')">
-            <img src="${item.url}" alt="${item.caption}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex items-end">
-              <p class="text-white text-[11px] font-bold">${item.caption}</p>
+      if (photoBox) {
+        photoBox.innerHTML = "";
+        (dbData.galeri || []).forEach(item => {
+          photoBox.innerHTML += `
+            <div class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer shadow-sm" onclick="openLightbox('${item.url}')">
+              <img src="${item.url}" alt="${item.caption}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+              <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex items-end">
+                <p class="text-white text-[11px] font-bold">${item.caption}</p>
+              </div>
             </div>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       // Youtube Video Gallery Render
       const ytVideosBox = document.getElementById('client-youtube-videos-grid');
-      ytVideosBox.innerHTML = "";
-      (dbData.youtubeVideos || []).forEach(video => {
-        ytVideosBox.innerHTML += `
-          <div class="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm space-y-3">
-            <h4 class="text-sm font-extrabold text-slate-800">${video.judul}</h4>
-            <div class="aspect-video w-full rounded-xl overflow-hidden shadow-inner bg-slate-100">
-              <iframe class="w-full h-full" src="https://www.youtube.com/embed/${video.videoId}?rel=0" frameborder="0" allow="encrypted-media" allowfullscreen></iframe>
+      if (ytVideosBox) {
+        ytVideosBox.innerHTML = "";
+        (dbData.youtubeVideos || []).forEach(video => {
+          ytVideosBox.innerHTML += `
+            <div class="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm space-y-3">
+              <h4 class="text-sm font-extrabold text-slate-800">${video.judul}</h4>
+              <div class="aspect-video w-full rounded-xl overflow-hidden shadow-inner bg-slate-100">
+                <iframe class="w-full h-full" src="https://www.youtube.com/embed/${video.videoId}?rel=0" frameborder="0" allow="encrypted-media" allowfullscreen></iframe>
+              </div>
             </div>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       // Blog Mading Sekolah
       const blogBox = document.getElementById('blog-posts-grid-container');
-      blogBox.innerHTML = "";
+      if (blogBox) blogBox.innerHTML = "";
       const homeNewsBox = document.getElementById('home-news-grid');
       if (homeNewsBox) homeNewsBox.innerHTML = "";
 
@@ -1843,7 +1869,7 @@
           </div>
         `;
 
-        blogBox.innerHTML += postCard;
+        if (blogBox) blogBox.innerHTML += postCard;
         if (homeNewsBox && index < 3) {
           homeNewsBox.innerHTML += postCard;
         }
@@ -1855,20 +1881,22 @@
 
       // Mikro Aplikasi Direktori
       const appsBox = document.getElementById('apps-links-grid-container');
-      appsBox.innerHTML = "";
-      (dbData.apps || []).forEach(item => {
-        appsBox.innerHTML += `
-          <a href="${item.url}" target="_blank" class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center gap-3 hover:scale-105 transition-all">
-            <div class="w-12 h-12 rounded-2xl bg-accent-soft text-accent flex items-center justify-center">
-              <span class="material-icons-round text-2xl">${item.ikon}</span>
-            </div>
-            <div>
-              <h4 class="font-bold text-slate-800 text-sm leading-tight">${item.nama}</h4>
-              <p class="text-[10px] text-slate-400 font-medium mt-0.5">Layanan Digital</p>
-            </div>
-          </a>
-        `;
-      });
+      if (appsBox) {
+        appsBox.innerHTML = "";
+        (dbData.apps || []).forEach(item => {
+          appsBox.innerHTML += `
+            <a href="${item.url}" target="_blank" class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center gap-3 hover:scale-105 transition-all">
+              <div class="w-12 h-12 rounded-2xl bg-accent-soft text-accent flex items-center justify-center">
+                <span class="material-icons-round text-2xl">${item.ikon}</span>
+              </div>
+              <div>
+                <h4 class="font-bold text-slate-800 text-sm leading-tight">${item.nama}</h4>
+                <p class="text-[10px] text-slate-400 font-medium mt-0.5">Layanan Digital</p>
+              </div>
+            </a>
+          `;
+        });
+      }
 
       // Update Slider & Kalender
       initHeroSlider();
@@ -1881,6 +1909,7 @@
     // =========================================================================
     function initHeroSlider() {
       const container = document.getElementById('slider-container');
+      if (!container) return;
       container.innerHTML = "";
       sliderImages.forEach((imgUrl, index) => {
         container.innerHTML += `
@@ -1906,6 +1935,7 @@
       if (activeSlideIndex < 0) activeSlideIndex = sliderImages.length - 1;
       
       const slides = document.querySelectorAll('.slider-item');
+      if (slides.length === 0) return;
       
       // Daftar kelas animasi acak
       const animations = ['slider-anim-1', 'slider-anim-2', 'slider-anim-3', 'slider-anim-4'];
@@ -1929,7 +1959,8 @@
         "Eksplorasi Pembelajaran Teknologi Komputer",
         "Budaya Nyaman Belajar & Berliterasi Kreatif"
       ];
-      document.getElementById('slider-title').textContent = titles[activeSlideIndex] || "Portal Informasi Digital";
+      const sliderTitleEl = document.getElementById('slider-title');
+      if (sliderTitleEl) sliderTitleEl.textContent = titles[activeSlideIndex] || "Portal Informasi Digital";
       
       // Trigger Animasi Ulang untuk Teks Overlay (Reflow trick)
       const textWrapper = document.getElementById('slider-text-wrapper');
@@ -1950,6 +1981,7 @@
     function playAudioBellYouTube(videoId) {
       const actualVideoId = videoId || dbData.global?.youtubeId || "7KQ3Ji3-uMQ";
       const wrapper = document.getElementById('youtube-bell-wrapper');
+      if (!wrapper) return;
       
       wrapper.innerHTML = `
         <iframe id="yt-bell-frame" src="https://www.youtube.com/embed/${actualVideoId}?autoplay=1&enablejsapi=1" allow="autoplay" class="w-1 h-1 opacity-0"></iframe>
@@ -2009,42 +2041,44 @@
         }
       }
 
-      if (activeClass) {
-        bellStatusEl.textContent = `Sedang: ${activeClass.namaPelajaran}`;
-        
-        const [endH, endM] = activeClass.jamSelesai.split(":").map(Number);
-        const endDate = new Date();
-        endDate.setHours(endH, endM, 0);
-        
-        const diffMs = endDate - now;
-        if (diffMs > 0) {
-          const totalSecs = Math.floor(diffMs / 1000);
-          const m = String(Math.floor(totalSecs / 60)).padStart(2, '0');
-          const s = String(totalSecs % 60).padStart(2, '0');
-          bellCountdownEl.textContent = `Selesai dalam: ${m}:${s}`;
-        }
+      if (bellStatusEl && bellCountdownEl) {
+        if (activeClass) {
+          bellStatusEl.textContent = `Sedang: ${activeClass.namaPelajaran}`;
+          
+          const [endH, endM] = activeClass.jamSelesai.split(":").map(Number);
+          const endDate = new Date();
+          endDate.setHours(endH, endM, 0);
+          
+          const diffMs = endDate - now;
+          if (diffMs > 0) {
+            const totalSecs = Math.floor(diffMs / 1000);
+            const m = String(Math.floor(totalSecs / 60)).padStart(2, '0');
+            const s = String(totalSecs % 60).padStart(2, '0');
+            bellCountdownEl.textContent = `Selesai dalam: ${m}:${s}`;
+          }
 
-        if (currentHM === activeClass.jamMulai && seconds === "00" && lastPlayedClassId !== activeClass.id) {
-          lastPlayedClassId = activeClass.id;
-          playAudioBellYouTube(activeClass.bellYtId);
-        }
-      } else if (nextClass) {
-        bellStatusEl.textContent = "Istirahat / Jam Kosong";
-        
-        const [nextH, nextM] = nextClass.jamMulai.split(":").map(Number);
-        const nextDate = new Date();
-        nextDate.setHours(nextH, nextM, 0);
+          if (currentHM === activeClass.jamMulai && seconds === "00" && lastPlayedClassId !== activeClass.id) {
+            lastPlayedClassId = activeClass.id;
+            playAudioBellYouTube(activeClass.bellYtId);
+          }
+        } else if (nextClass) {
+          bellStatusEl.textContent = "Istirahat / Jam Kosong";
+          
+          const [nextH, nextM] = nextClass.jamMulai.split(":").map(Number);
+          const nextDate = new Date();
+          nextDate.setHours(nextH, nextM, 0);
 
-        const diffMs = nextDate - now;
-        if (diffMs > 0) {
-          const totalSecs = Math.floor(diffMs / 1000);
-          const m = String(Math.floor(totalSecs / 60)).padStart(2, '0');
-          const s = String(totalSecs % 60).padStart(2, '0');
-          bellCountdownEl.textContent = `Mulai ${nextClass.namaPelajaran} dalam: ${m}:${s}`;
+          const diffMs = nextDate - now;
+          if (diffMs > 0) {
+            const totalSecs = Math.floor(diffMs / 1000);
+            const m = String(Math.floor(totalSecs / 60)).padStart(2, '0');
+            const s = String(totalSecs % 60).padStart(2, '0');
+            bellCountdownEl.textContent = `Mulai ${nextClass.namaPelajaran} dalam: ${m}:${s}`;
+          }
+        } else {
+          bellStatusEl.textContent = "KBM Selesai / Libur";
+          bellCountdownEl.textContent = "Sampai Jumpa Esok Hari";
         }
-      } else {
-        bellStatusEl.textContent = "KBM Selesai / Libur";
-        bellCountdownEl.textContent = "Sampai Jumpa Esok Hari";
       }
     }
     
@@ -2053,6 +2087,7 @@
     // Render Jadwal di Sisi Client Akademik Tab
     function renderJadwalClient() {
       const container = document.getElementById('client-jadwal-wrapper');
+      if (!container) return;
       container.innerHTML = "";
 
       const days = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
@@ -2133,12 +2168,14 @@
 
     function renderCalendar() {
       const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-      document.getElementById('calendar-month-title').textContent = `${monthNames[calendarCurrentMonth]} ${calendarCurrentYear}`;
+      const calendarMonthTitleEl = document.getElementById('calendar-month-title');
+      if (calendarMonthTitleEl) calendarMonthTitleEl.textContent = `${monthNames[calendarCurrentMonth]} ${calendarCurrentYear}`;
 
       const firstDayIdx = new Date(calendarCurrentYear, calendarCurrentMonth, 1).getDay();
       const daysInMonth = new Date(calendarCurrentYear, calendarCurrentMonth + 1, 0).getDate();
 
       const grid = document.getElementById('calendar-days-grid');
+      if (!grid) return;
       grid.innerHTML = "";
 
       for (let i = 0; i < firstDayIdx; i++) {
@@ -2186,6 +2223,7 @@
       selectedCalendarDate = dateStr;
       const events = (dbData.kalender || []).filter(e => e.tanggal === dateStr);
       const detailCard = document.getElementById('event-detail-card');
+      if (!detailCard) return;
 
       if (events.length > 0) {
         const ev = events[0];
@@ -2218,6 +2256,7 @@
 
     function renderMonthlyEventsSummary() {
       const summaryList = document.getElementById('monthly-events-list');
+      if (!summaryList) return;
       summaryList.innerHTML = "";
 
       const matchingEvents = (dbData.kalender || []).filter(e => {
@@ -2269,6 +2308,7 @@
       });
 
       const blogBox = document.getElementById('blog-posts-grid-container');
+      if (!blogBox) return;
       blogBox.innerHTML = "";
       const defaultThumb = "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&q=80&w=400";
 
@@ -2304,48 +2344,52 @@
       if (!post) return;
       
       const blogTab = document.getElementById('tab-blog');
-      blogTab.innerHTML = `
-        <div class="space-y-6">
-          <button onclick="restoreBlogMainView()" class="flex items-center gap-2 font-bold text-xs text-accent"><span class="material-icons-round text-sm">arrow_back</span> Kembali ke Mading</button>
-          <div class="bg-white p-6 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-            <div class="flex items-center gap-3 text-xs font-bold">
-              <span class="bg-accent-soft text-accent px-3 py-1 rounded uppercase">${post.kategori}</span>
-              <span class="text-slate-400">${post.tanggal}</span>
-            </div>
-            <h2 class="text-2xl md:text-4xl font-black text-slate-800">${post.judul}</h2>
-            <div class="border-t border-slate-100 pt-6 text-slate-600 text-sm leading-relaxed space-y-4">
-              ${post.konten}
+      if (blogTab) {
+        blogTab.innerHTML = `
+          <div class="space-y-6">
+            <button onclick="restoreBlogMainView()" class="flex items-center gap-2 font-bold text-xs text-accent"><span class="material-icons-round text-sm">arrow_back</span> Kembali ke Mading</button>
+            <div class="bg-white p-6 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+              <div class="flex items-center gap-3 text-xs font-bold">
+                <span class="bg-accent-soft text-accent px-3 py-1 rounded uppercase">${post.kategori}</span>
+                <span class="text-slate-400">${post.tanggal}</span>
+              </div>
+              <h2 class="text-2xl md:text-4xl font-black text-slate-800">${post.judul}</h2>
+              <div class="border-t border-slate-100 pt-6 text-slate-600 text-sm leading-relaxed space-y-4">
+                ${post.konten}
+              </div>
             </div>
           </div>
-        </div>
-      `;
+        `;
+      }
     }
 
     function restoreBlogMainView() {
       const blogTab = document.getElementById('tab-blog');
-      blogTab.innerHTML = `
-        <section class="bg-primary text-white p-8 md:p-12 rounded-3xl relative overflow-hidden shadow-lg">
-          <div class="relative z-10 max-w-2xl">
-            <span class="bg-accent text-white px-3.5 py-1 rounded-full text-xs font-extrabold uppercase">Kreativitas Karya</span>
-            <h2 class="text-3xl md:text-5xl font-black mt-4 leading-tight">Mading Digital & Opini</h2>
-            <p class="text-white/80 text-sm md:text-base mt-2">Platform penulisan karya, berita internal, artikel, serta pemikiran cerdas siswa.</p>
-          </div>
-        </section>
-        <section class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-slate-100">
-          <div class="relative w-full md:max-w-xs">
-            <span class="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-            <input type="text" id="blog-search-input" oninput="filterBlog()" placeholder="Cari artikel..." class="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none">
-          </div>
-          <div class="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
-            <button onclick="filterBlogCategory('semua')" class="px-4 py-2 rounded-full font-bold text-xs bg-accent text-white transition-all blog-cat-btn" data-cat="semua">Semua</button>
-            <button onclick="filterBlogCategory('artikel')" class="px-4 py-2 rounded-full font-bold text-xs bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all blog-cat-btn" data-cat="artikel">Artikel Guru</button>
-            <button onclick="filterBlogCategory('karya')" class="px-4 py-2 rounded-full font-bold text-xs bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all blog-cat-btn" data-cat="karya">Karya Siswa</button>
-            <button onclick="filterBlogCategory('berita')" class="px-4 py-2 rounded-full font-bold text-xs bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all blog-cat-btn" data-cat="berita">Berita Sekolah</button>
-          </div>
-        </section>
-        <section class="grid grid-cols-1 md:grid-cols-3 gap-6" id="blog-posts-grid-container"></section>
-      `;
-      filterBlog();
+      if (blogTab) {
+        blogTab.innerHTML = `
+          <section class="bg-primary text-white p-8 md:p-12 rounded-3xl relative overflow-hidden shadow-lg">
+            <div class="relative z-10 max-w-2xl">
+              <span class="bg-accent text-white px-3.5 py-1 rounded-full text-xs font-extrabold uppercase">Kreativitas Karya</span>
+              <h2 class="text-3xl md:text-5xl font-black mt-4 leading-tight">Mading Digital & Opini</h2>
+              <p class="text-white/80 text-sm md:text-base mt-2">Platform penulisan karya, berita internal, artikel, serta pemikiran cerdas siswa.</p>
+            </div>
+          </section>
+          <section class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-slate-100">
+            <div class="relative w-full md:max-w-xs">
+              <span class="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+              <input type="text" id="blog-search-input" oninput="filterBlog()" placeholder="Cari artikel..." class="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none">
+            </div>
+            <div class="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
+              <button onclick="filterBlogCategory('semua')" class="px-4 py-2 rounded-full font-bold text-xs bg-accent text-white transition-all blog-cat-btn" data-cat="semua">Semua</button>
+              <button onclick="filterBlogCategory('artikel')" class="px-4 py-2 rounded-full font-bold text-xs bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all blog-cat-btn" data-cat="artikel">Artikel Guru</button>
+              <button onclick="filterBlogCategory('karya')" class="px-4 py-2 rounded-full font-bold text-xs bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all blog-cat-btn" data-cat="karya">Karya Siswa</button>
+              <button onclick="filterBlogCategory('berita')" class="px-4 py-2 rounded-full font-bold text-xs bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all blog-cat-btn" data-cat="berita">Berita Sekolah</button>
+            </div>
+          </section>
+          <section class="grid grid-cols-1 md:grid-cols-3 gap-6" id="blog-posts-grid-container"></section>
+        `;
+        filterBlog();
+      }
     }
 
     // =========================================================================
@@ -2430,69 +2474,75 @@
       const menusList = document.getElementById('admin-menus-list');
       const parentSelect = document.getElementById('input-menu-parent');
       
-      menusList.innerHTML = "";
-      parentSelect.innerHTML = `<option value="none">-- Bukan Submenu (Menu Utama Atas) --</option>`;
+      if (menusList && parentSelect) {
+        menusList.innerHTML = "";
+        parentSelect.innerHTML = `<option value="none">-- Bukan Submenu (Menu Utama Atas) --</option>`;
 
-      (dbData.menus || []).forEach(m => {
-        parentSelect.innerHTML += `<option value="${m.id}">${m.title}</option>`;
+        (dbData.menus || []).forEach(m => {
+          parentSelect.innerHTML += `<option value="${m.id}">${m.title}</option>`;
 
-        let subItemsLabel = "";
-        if (m.submenus && m.submenus.length > 0) {
-          subItemsLabel += `<div class="mt-1.5 pl-4 space-y-1">`;
-          m.submenus.forEach(sub => {
-            subItemsLabel += `
-              <div class="flex items-center justify-between p-1.5 bg-white border border-slate-100 rounded-lg text-[11px]">
-                <span>&bull; ${sub.title} (Target: ${sub.target})</span>
-                <button onclick="deleteSubMenu('${m.id}', '${sub.id}')" class="text-red-500 font-extrabold">&times; Hapus Sub</button>
+          let subItemsLabel = "";
+          if (m.submenus && m.submenus.length > 0) {
+            subItemsLabel += `<div class="mt-1.5 pl-4 space-y-1">`;
+            m.submenus.forEach(sub => {
+              subItemsLabel += `
+                <div class="flex items-center justify-between p-1.5 bg-white border border-slate-100 rounded-lg text-[11px]">
+                  <span>&bull; ${sub.title} (Target: ${sub.target})</span>
+                  <button onclick="deleteSubMenu('${m.id}', '${sub.id}')" class="text-red-500 font-extrabold">&times; Hapus Sub</button>
+                </div>
+              `;
+            });
+            subItemsLabel += `</div>`;
+          }
+
+          menusList.innerHTML += `
+            <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+              <div class="flex justify-between items-center text-xs font-bold">
+                <span class="flex items-center gap-1.5">
+                  <span class="material-icons-round text-base text-accent">${m.icon || 'star'}</span>
+                  ${m.title} <span class="text-slate-400 font-normal">(${m.type} - target: ${m.target})</span>
+                </span>
+                <button onclick="deleteMainMenu('${m.id}')" class="text-red-600 font-bold hover:underline">Hapus Menu Utama</button>
               </div>
-            `;
-          });
-          subItemsLabel += `</div>`;
-        }
-
-        menusList.innerHTML += `
-          <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
-            <div class="flex justify-between items-center text-xs font-bold">
-              <span class="flex items-center gap-1.5">
-                <span class="material-icons-round text-base text-accent">${m.icon || 'star'}</span>
-                ${m.title} <span class="text-slate-400 font-normal">(${m.type} - target: ${m.target})</span>
-              </span>
-              <button onclick="deleteMainMenu('${m.id}')" class="text-red-600 font-bold hover:underline">Hapus Menu Utama</button>
+              ${subItemsLabel}
             </div>
-            ${subItemsLabel}
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       const adminJadwalBox = document.getElementById('admin-jadwal-list');
-      adminJadwalBox.innerHTML = "";
-      (dbData.jadwal || []).forEach(j => {
-        adminJadwalBox.innerHTML += `
-          <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs font-bold border border-slate-100">
-            <div>
-              <span class="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded text-[10px] mr-1.5">${j.hari}</span>
-              <span class="text-slate-400 font-normal mr-2">${j.jamMulai} - ${j.jamSelesai}</span>
-              <span>${j.namaPelajaran}</span>
-              <p class="text-[9px] text-slate-400 mt-1">YT Bell ID: ${j.bellYtId || 'Bawaan/Default'}</p>
+      if (adminJadwalBox) {
+        adminJadwalBox.innerHTML = "";
+        (dbData.jadwal || []).forEach(j => {
+          adminJadwalBox.innerHTML += `
+            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs font-bold border border-slate-100">
+              <div>
+                <span class="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded text-[10px] mr-1.5">${j.hari}</span>
+                <span class="text-slate-400 font-normal mr-2">${j.jamMulai} - ${j.jamSelesai}</span>
+                <span>${j.namaPelajaran}</span>
+                <p class="text-[9px] text-slate-400 mt-1">YT Bell ID: ${j.bellYtId || 'Bawaan/Default'}</p>
+              </div>
+              <button onclick="deleteJadwal('${j.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
             </div>
-            <button onclick="deleteJadwal('${j.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       const adminYtBox = document.getElementById('admin-ytvideos-list');
-      adminYtBox.innerHTML = "";
-      (dbData.youtubeVideos || []).forEach(v => {
-        adminYtBox.innerHTML += `
-          <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl text-xs font-bold border">
-            <div>
-              <span class="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded mr-2 uppercase">Video</span>
-              <span>${v.judul} <span class="text-slate-400 font-normal">(${v.videoId})</span></span>
+      if (adminYtBox) {
+        adminYtBox.innerHTML = "";
+        (dbData.youtubeVideos || []).forEach(v => {
+          adminYtBox.innerHTML += `
+            <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl text-xs font-bold border">
+              <div>
+                <span class="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded mr-2 uppercase">Video</span>
+                <span>${v.judul} <span class="text-slate-400 font-normal">(${v.videoId})</span></span>
+              </div>
+              <button onclick="deleteYoutubeVideo('${v.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
             </div>
-            <button onclick="deleteYoutubeVideo('${v.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       const s = dbData.sambutan || {};
       document.getElementById('input-kepsek-nama').value = s.nama || '';
@@ -2510,255 +2560,137 @@
       document.getElementById('input-visi-title').value = dbData.visi?.title || '';
       
       const adminMisiBox = document.getElementById('admin-misi-list');
-      adminMisiBox.innerHTML = "";
-      (dbData.misi || []).forEach((item, idx) => {
-        adminMisiBox.innerHTML += `
-          <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl text-xs font-bold">
-            <span>${idx+1}. ${item}</span>
-            <button onclick="deleteMisi(${idx})" class="text-red-500 hover:text-red-700 font-extrabold">&times; Hapus</button>
-          </div>
-        `;
-      });
+      if (adminMisiBox) {
+        adminMisiBox.innerHTML = "";
+        (dbData.misi || []).forEach((item, idx) => {
+          adminMisiBox.innerHTML += `
+            <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl text-xs font-bold">
+              <span>${idx+1}. ${item}</span>
+              <button onclick="deleteMisi(${idx})" class="text-red-500 hover:text-red-700 font-extrabold">&times; Hapus</button>
+            </div>
+          `;
+        });
+      }
 
       const adminHistBox = document.getElementById('admin-sejarah-list');
-      adminHistBox.innerHTML = "";
-      (dbData.sejarah || []).forEach(item => {
-        adminHistBox.innerHTML += `
-          <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs font-bold border border-slate-100">
-            <div>
-              <span class="bg-primary text-white px-2 py-0.5 rounded text-[10px] mr-2">${item.tahun}</span>
-              <span>${item.judul}</span>
+      if (adminHistBox) {
+        adminHistBox.innerHTML = "";
+        (dbData.sejarah || []).forEach(item => {
+          adminHistBox.innerHTML += `
+            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs font-bold border border-slate-100">
+              <div>
+                <span class="bg-primary text-white px-2 py-0.5 rounded text-[10px] mr-2">${item.tahun}</span>
+                <span>${item.judul}</span>
+              </div>
+              <button onclick="deleteSejarah('${item.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
             </div>
-            <button onclick="deleteSejarah('${item.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       const adminEkskulBox = document.getElementById('admin-ekskul-list');
-      adminEkskulBox.innerHTML = "";
-      (dbData.ekskul || []).forEach(item => {
-        adminEkskulBox.innerHTML += `
-          <div class="p-3 bg-slate-50 rounded-xl flex items-center justify-between text-xs font-bold border border-slate-100">
-            <div class="flex items-center gap-2">
-              <img src="${item.foto}" class="w-10 h-10 rounded-lg object-cover">
-              <span>${item.nama}</span>
+      if (adminEkskulBox) {
+        adminEkskulBox.innerHTML = "";
+        (dbData.ekskul || []).forEach(item => {
+          adminEkskulBox.innerHTML += `
+            <div class="p-3 bg-slate-50 rounded-xl flex items-center justify-between text-xs font-bold border border-slate-100">
+              <div class="flex items-center gap-2">
+                <img src="${item.foto}" class="w-10 h-10 rounded-lg object-cover">
+                <span>${item.nama}</span>
+              </div>
+              <button onclick="deleteEkskul('${item.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
             </div>
-            <button onclick="deleteEkskul('${item.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       const adminAlumniBox = document.getElementById('admin-alumni-list');
-      adminAlumniBox.innerHTML = "";
-      (dbData.alumni || []).forEach(item => {
-        adminAlumniBox.innerHTML += `
-          <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs font-bold border">
-            <div>
-              <span class="text-slate-400 font-normal mr-2">[Lulusan ${item.tahun}]</span>
-              <span>${item.nama}</span>
+      if (adminAlumniBox) {
+        adminAlumniBox.innerHTML = "";
+        (dbData.alumni || []).forEach(item => {
+          adminAlumniBox.innerHTML += `
+            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs font-bold border">
+              <div>
+                <span class="text-slate-400 font-normal mr-2">[Lulusan ${item.tahun}]</span>
+                <span>${item.nama}</span>
+              </div>
+              <button onclick="deleteAlumni('${item.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
             </div>
-            <button onclick="deleteAlumni('${item.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       const adminCalBox = document.getElementById('admin-calendar-list');
-      adminCalBox.innerHTML = "";
-      (dbData.kalender || []).forEach(item => {
-        let badgeColor = "bg-slate-400";
-        if (item.kategori === 'red') badgeColor = "bg-red-500";
-        else if (item.kategori === 'yellow') badgeColor = "bg-amber-500";
-        else if (item.kategori === 'blue') badgeColor = "bg-blue-500";
-        else if (item.kategori === 'green') badgeColor = "bg-emerald-500";
-        else if (item.kategori === 'indigo') badgeColor = "bg-indigo-500";
+      if (adminCalBox) {
+        adminCalBox.innerHTML = "";
+        (dbData.kalender || []).forEach(item => {
+          let badgeColor = "bg-slate-400";
+          if (item.kategori === 'red') badgeColor = "bg-red-500";
+          else if (item.kategori === 'yellow') badgeColor = "bg-amber-500";
+          else if (item.kategori === 'blue') badgeColor = "bg-blue-500";
+          else if (item.kategori === 'green') badgeColor = "bg-emerald-500";
+          else if (item.kategori === 'indigo') badgeColor = "bg-indigo-500";
 
-        adminCalBox.innerHTML += `
-          <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs font-bold border">
-            <div>
-              <span class="${badgeColor} w-2.5 h-2.5 rounded-full inline-block mr-2"></span>
-              <span class="text-slate-400 font-normal mr-2">${item.tanggal}</span>
-              <span>${item.judul}</span>
+          adminCalBox.innerHTML += `
+            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs font-bold border">
+              <div>
+                <span class="${badgeColor} w-2.5 h-2.5 rounded-full inline-block mr-2"></span>
+                <span class="text-slate-400 font-normal mr-2">${item.tanggal}</span>
+                <span>${item.judul}</span>
+              </div>
+              <button onclick="deleteKalender('${item.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
             </div>
-            <button onclick="deleteKalender('${item.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       const adminGalBox = document.getElementById('admin-gallery-list');
-      adminGalBox.innerHTML = "";
-      (dbData.galeri || []).forEach(item => {
-        adminGalBox.innerHTML += `
-          <div class="relative aspect-square rounded-xl overflow-hidden group">
-            <img src="${item.url}" class="w-full h-full object-cover">
-            <button onclick="deletePhotoFromGallery('${item.id}')" class="absolute inset-0 bg-red-600/80 text-white font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-xs">Hapus Foto</button>
-          </div>
-        `;
-      });
+      if (adminGalBox) {
+        adminGalBox.innerHTML = "";
+        (dbData.galeri || []).forEach(item => {
+          adminGalBox.innerHTML += `
+            <div class="relative aspect-square rounded-xl overflow-hidden group">
+              <img src="${item.url}" class="w-full h-full object-cover">
+              <button onclick="deletePhotoFromGallery('${item.id}')" class="absolute inset-0 bg-red-600/80 text-white font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-xs">Hapus Foto</button>
+            </div>
+          `;
+        });
+      }
 
       const adminBlogBox = document.getElementById('admin-blog-list');
-      adminBlogBox.innerHTML = "";
-      (dbData.blog || []).forEach(item => {
-        adminBlogBox.innerHTML += `
-          <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs font-bold border">
-            <div>
-              <span class="bg-accent-soft text-accent px-2 py-0.5 rounded text-[10px] mr-2 uppercase">${item.kategori}</span>
-              <span>${item.judul}</span>
+      if (adminBlogBox) {
+        adminBlogBox.innerHTML = "";
+        (dbData.blog || []).forEach(item => {
+          adminBlogBox.innerHTML += `
+            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs font-bold border">
+              <div>
+                <span class="bg-accent-soft text-accent px-2 py-0.5 rounded text-[10px] mr-2 uppercase">${item.kategori}</span>
+                <span>${item.judul}</span>
+              </div>
+              <button onclick="deleteBlogPost('${item.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
             </div>
-            <button onclick="deleteBlogPost('${item.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
-          </div>
-        `;
-      });
+          `;
+        });
+      }
 
       const adminAppsBox = document.getElementById('admin-apps-list');
-      adminAppsBox.innerHTML = "";
-      (dbData.apps || []).forEach(item => {
-        adminAppsBox.innerHTML += `
-          <div class="p-3 bg-slate-50 rounded-xl flex items-center justify-between text-xs font-bold border">
-            <div class="flex items-center gap-1.5">
-              <span class="material-icons-round text-sm text-accent">${item.ikon}</span>
-              <span>${item.nama}</span>
+      if (adminAppsBox) {
+        adminAppsBox.innerHTML = "";
+        (dbData.apps || []).forEach(item => {
+          adminAppsBox.innerHTML += `
+            <div class="p-3 bg-slate-50 rounded-xl flex items-center justify-between text-xs font-bold border">
+              <div class="flex items-center gap-1.5">
+                <span class="material-icons-round text-sm text-accent">${item.ikon}</span>
+                <span>${item.nama}</span>
+              </div>
+              <button onclick="deleteSchoolApp('${item.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
             </div>
-            <button onclick="deleteSchoolApp('${item.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
-          </div>
-        `;
-      });
-    }
-
-    // =========================================================================
-    // CRUD IMPLEMENTATION FUNCTIONS
-    // =========================================================================
-
-    function addMenu(e) {
-      e.preventDefault();
-      const parentId = document.getElementById('input-menu-parent').value;
-      const title = document.getElementById('input-menu-title').value;
-      const targetSelect = document.getElementById('input-menu-target').value;
-      const icon = document.getElementById('input-menu-icon').value || 'link';
-
-      let type = "tab";
-      let target = targetSelect;
-      let url = "";
-      let html = "";
-
-      if (targetSelect === 'external_url') {
-        type = "external_url";
-        target = "external_url";
-        url = document.getElementById('input-menu-url').value;
-      } else if (targetSelect === 'custom_html') {
-        type = "custom_html";
-        target = "custom_html";
-        html = document.getElementById('input-menu-html').value;
+          `;
+        });
       }
-
-      if (!dbData.menus) dbData.menus = [];
-
-      const newMenuItem = {
-        id: "m_" + Date.now(),
-        title: title,
-        type: type,
-        target: target,
-        url: url,
-        html: html,
-        icon: icon,
-        submenus: []
-      };
-
-      if (parentId === 'none') {
-        dbData.menus.push(newMenuItem);
-      } else {
-        const parent = dbData.menus.find(m => m.id === parentId);
-        if (parent) {
-          if (!parent.submenus) parent.submenus = [];
-          parent.submenus.push({
-            id: "sm_" + Date.now(),
-            title: title,
-            type: type,
-            target: target,
-            url: url,
-            html: html
-          });
-        }
-      }
-
-      document.getElementById('input-menu-title').value = "";
-      document.getElementById('input-menu-url').value = "";
-      document.getElementById('input-menu-html').value = "";
-      document.getElementById('input-menu-parent').value = "none";
-      document.getElementById('input-menu-icon').value = "";
-      toggleMenuTargetInput();
-
-      syncDatabase();
     }
 
-    function deleteMainMenu(id) {
-      dbData.menus = dbData.menus.filter(m => m.id !== id);
-      syncDatabase();
-    }
-
-    function deleteSubMenu(parentId, subId) {
-      const parent = dbData.menus.find(m => m.id === parentId);
-      if (parent && parent.submenus) {
-        parent.submenus = parent.submenus.filter(s => s.id !== subId);
-      }
-      syncDatabase();
-    }
-
-    function addJadwal(e) {
-      e.preventDefault();
-      const hari = document.getElementById('input-jadwal-hari').value;
-      const jamMulai = document.getElementById('input-jadwal-mulai').value;
-      const jamSelesai = document.getElementById('input-jadwal-selesai').value;
-      const namaPelajaran = document.getElementById('input-jadwal-mapel').value;
-      const bellYtId = document.getElementById('input-jadwal-bell-yt').value;
-
-      if (!dbData.jadwal) dbData.jadwal = [];
-
-      dbData.jadwal.push({
-        id: "j_" + Date.now(),
-        hari,
-        jamMulai,
-        jamSelesai,
-        namaPelajaran,
-        bellYtId
-      });
-
-      document.getElementById('input-jadwal-mulai').value = "";
-      document.getElementById('input-jadwal-selesai').value = "";
-      document.getElementById('input-jadwal-mapel').value = "";
-      document.getElementById('input-jadwal-bell-yt').value = "";
-
-      syncDatabase();
-    }
-
-    function deleteJadwal(id) {
-      dbData.jadwal = dbData.jadwal.filter(j => j.id !== id);
-      syncDatabase();
-    }
-
-    function addYoutubeVideo(e) {
-      e.preventDefault();
-      const judul = document.getElementById('input-ytvid-title').value;
-      const videoId = document.getElementById('input-ytvid-id').value;
-
-      if (!dbData.youtubeVideos) dbData.youtubeVideos = [];
-
-      dbData.youtubeVideos.push({
-        id: "yv_" + Date.now(),
-        judul,
-        videoId
-      });
-
-      document.getElementById('input-ytvid-title').value = "";
-      document.getElementById('input-ytvid-id').value = "";
-
-      syncDatabase();
-    }
-
-    function deleteYoutubeVideo(id) {
-      dbData.youtubeVideos = dbData.youtubeVideos.filter(v => v.id !== id);
-      syncDatabase();
-    }
-
+    // CRUD SAVE HANDLERS
     function saveGlobalSettings(e) {
       e.preventDefault();
       dbData.global = {
@@ -2776,6 +2708,7 @@
       syncDatabase();
     }
 
+    // Save Sambutan
     function saveSambutan(e) {
       e.preventDefault();
       dbData.sambutan = {
@@ -2787,6 +2720,7 @@
       syncDatabase();
     }
 
+    // Save Kontak
     function saveKontak(e) {
       e.preventDefault();
       dbData.kontak = {
@@ -2799,12 +2733,14 @@
       syncDatabase();
     }
 
+    // Save Visi
     function saveVisi(e) {
       e.preventDefault();
       dbData.visi = { title: document.getElementById('input-visi-title').value };
       syncDatabase();
     }
 
+    // Add Misi
     function addMisi(e) {
       e.preventDefault();
       const txt = document.getElementById('input-misi-text').value;
@@ -2819,6 +2755,7 @@
       syncDatabase();
     }
 
+    // Add Sejarah
     function addSejarah(e) {
       e.preventDefault();
       const item = {
@@ -2840,6 +2777,7 @@
       syncDatabase();
     }
 
+    // Add Ekskul
     function addEkskul(e) {
       e.preventDefault();
       const item = {
@@ -2861,6 +2799,7 @@
       syncDatabase();
     }
 
+    // Add Alumni
     function addAlumni(e) {
       e.preventDefault();
       const item = {
@@ -2884,6 +2823,7 @@
       syncDatabase();
     }
 
+    // Add Kalender
     function addKalender(e) {
       e.preventDefault();
       const item = {
@@ -2901,11 +2841,13 @@
       syncDatabase();
     }
 
+    // Delete Kalender
     function deleteKalender(id) {
       dbData.kalender = dbData.kalender.filter(x => x.id !== id);
       syncDatabase();
     }
 
+    // Add Photo to Gallery
     function addPhotoToGallery(e) {
       e.preventDefault();
       const item = {
@@ -2925,6 +2867,7 @@
       syncDatabase();
     }
 
+    // Add Blog Post
     function addBlogPost(e) {
       e.preventDefault();
       const today = new Date();
@@ -2948,6 +2891,7 @@
       syncDatabase();
     }
 
+    // Add School App
     function addSchoolApp(e) {
       e.preventDefault();
       const item = {
