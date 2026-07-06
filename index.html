@@ -154,8 +154,11 @@
 
   <!-- ================= CONFIGURATION JEMBATAN GAS ================= -->
   <script>
-    // MASUKKAN URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz4jy7D-p4LjS0uv7iVY2ZmiNy7EM7bPHYVebq5mH9AdmyzT9FUPF6L76Z6iFldD78lJw/exec?action=getAll&apiKey=SarjanaSoft_Aman_123!";
+    // MASUKKAN URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI (Gunakan URL New Deployment terbaru)
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz4jy7D-p4LjS0uv7iVY2ZmiNy7EM7bPHYVebq5mH9AdmyzT9FUPF6L76Z6iFldD78lJw/exec";
+    
+    // Kunci Rahasia API
+    const SECRET_API_KEY = "SarjanaSoft_Aman_123!";
   </script>
   <!-- ============================================================== -->
 
@@ -1457,7 +1460,9 @@
         return { status: "local", data: dbData };
       }
       try {
-        const response = await fetch(`${GAS_API_URL}?action=${endpoint}`);
+        // PERBAIKAN: Selipkan apiKey dengan sangat jelas menggunakan backtick & template literals
+        const fullUrl = `${GAS_API_URL}?action=${endpoint}&apiKey=${SECRET_API_KEY}`;
+        const response = await fetch(fullUrl);
         if (!response.ok) throw new Error("Gagal mengambil data server");
         return await response.json();
       } catch (err) {
@@ -1472,6 +1477,7 @@
         try {
           const formData = new URLSearchParams();
           formData.append('action', 'saveAll');
+          formData.append('apiKey', SECRET_API_KEY); // Mengirim kunci API
           formData.append('data', JSON.stringify(dbData));
 
           const response = await fetch(GAS_API_URL, {
